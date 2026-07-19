@@ -114,10 +114,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         AXIsProcessTrustedWithOptions(options as CFDictionary)
+        var contradictions = 0
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
-            guard F12Tap.shared.start() else { return }
-            timer.invalidate()
-            self?.permissionTimer = nil
+            if F12Tap.shared.start() {
+                timer.invalidate()
+                self?.permissionTimer = nil
+                return
+            }
+            // Deleting the TCC entry poisons the running process: after a
+            // re-grant, tap creation keeps failing here forever while
+            // AXIsProcessTrusted reports true. That contradiction is only
+            // resolvable by a fresh process — relaunch ourselves.
+            if AXIsProcessTrusted() {
+                contradictions += 1
+                if contradictions >= 2 {
+                    self?.relaunchIfAllowed()
+                }
+            } else {
+                contradictions = 0
+            }
+        }
+    }
+
+    private func relaunchIfAllowed() {
+        let key = "lastAutoRelaunch"
+        let now = Date().timeIntervalSince1970
+        guard now - UserDefaults.standard.double(forKey: key) > 60 else { return }
+        UserDefaults.standard.set(now, forKey: key)
+        log.notice("TCC state contradictory (trusted, but tap creation fails) — relaunching")
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config) { _, _ in }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            NSApp.terminate(nil)
         }
     }
 }
