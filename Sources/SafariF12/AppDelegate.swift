@@ -45,7 +45,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 defer: false
             )
             window.title = "SafariF12"
-            window.contentViewController = NSHostingController(rootView: StatusView())
+            let hosting = NSHostingController(rootView: StatusView())
+            window.contentViewController = hosting
+            // Force SwiftUI layout to the final size before centering —
+            // centering a zero-sized window puts it in a wrong spot.
+            window.setContentSize(hosting.view.fittingSize)
             window.isReleasedWhenClosed = false
             window.delegate = self
             window.center()
