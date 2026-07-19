@@ -12,10 +12,16 @@ Safari → Settings → Advanced → check **"Show features for web developers"*
 
 ## Install
 
-Download the latest `.dmg` from Releases, open it, and drag `SafariF12.app`
-to your `/Applications` folder. Launch it and grant Accessibility permission
-when prompted (required for the global keyboard event tap). Use the menu bar
-icon to enable **Launch at Login**.
+Download the latest `.dmg` from Releases (or
+`brew install --cask rxliuli/tap/safari-f12`), drag `SafariF12.app` to your
+`/Applications` folder, and launch it. Grant Accessibility permission when
+prompted (required for the global keyboard event tap).
+
+SafariF12 registers itself to launch at login — macOS notifies you and lists
+it under System Settings → General → Login Items, and the menu bar toggle
+turns it off anytime. Prefer total silence? Pick **Hide Menu Bar Icon** from
+the menu; the app keeps working in the background. To bring the icon back,
+open SafariF12 from Finder or Launchpad again while it is running.
 
 ## Build from source
 
