@@ -119,6 +119,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             if F12Tap.shared.start() {
                 timer.invalidate()
                 self?.permissionTimer = nil
+                UserDefaults.standard.set(0, forKey: "autoRelaunchCount")
                 return
             }
             // Deleting the TCC entry poisons the running process: after a
@@ -137,10 +138,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func relaunchIfAllowed() {
+        // If a fresh process didn't resolve the contradiction, relaunching
+        // again won't either (the TCC db itself is inconsistent) — give up
+        // after two attempts and leave the status window as guidance. The
+        // counter resets whenever the tap starts successfully.
+        let countKey = "autoRelaunchCount"
+        let count = UserDefaults.standard.integer(forKey: countKey)
+        guard count < 2 else { return }
         let key = "lastAutoRelaunch"
         let now = Date().timeIntervalSince1970
         guard now - UserDefaults.standard.double(forKey: key) > 60 else { return }
         UserDefaults.standard.set(now, forKey: key)
+        UserDefaults.standard.set(count + 1, forKey: countKey)
         log.notice("TCC state contradictory (trusted, but tap creation fails) — relaunching")
         let config = NSWorkspace.OpenConfiguration()
         config.createsNewApplicationInstance = true
