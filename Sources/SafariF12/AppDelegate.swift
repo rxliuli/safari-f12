@@ -5,7 +5,6 @@ import SwiftUI
 import os.log
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
-    static let userDisabledLoginKey = "userDisabledLaunchAtLogin"
     private let hasLaunchedKey = "hasLaunchedBefore"
 
     private var statusWindow: NSWindow?
@@ -16,19 +15,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
-        autoRegisterLoginItem()
+        registerLoginItemOnce()
         startTapWhenTrusted()
 
-        // Watchdog: notice when the tap died behind our back. Deleting the
-        // permission entry can leave the tap "enabled" with stale trust
-        // values, so the probe (a fresh tap creation) is the authority. The
-        // tap is listen-only, so this is about restoring F12, not safety.
+        // Keepalive: recover if the tap ended up disabled without a callback
+        // telling us (sleep/wake, secure input edge cases). Permission state
+        // needs no runtime monitoring — Input Monitoring revocation only
+        // takes effect on the next launch.
         watchdogTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
-            guard F12Tap.shared.isRunning else { return }
-            if !F12Tap.shared.isEnabled || !F12Tap.probeAuthorization() {
-                F12Tap.shared.stop()
-                self?.handlePermissionLost()
-            }
+            guard F12Tap.shared.isRunning, !F12Tap.shared.isEnabled else { return }
+            F12Tap.shared.stop()
+            self?.handlePermissionLost()
         }
 
         // Show the status window on first launch, or whenever the tap is not
@@ -82,24 +79,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusWindow = nil
     }
 
-    /// Register as a login item on behalf of the user — the whole point of the
-    /// app is to be always-on. macOS shows a "background items added"
-    /// notification and lists it in System Settings, so this is transparent
-    /// and revocable. Never re-registers after the user explicitly turned the
-    /// toggle off.
-    private func autoRegisterLoginItem() {
-        guard !UserDefaults.standard.bool(forKey: Self.userDisabledLoginKey) else { return }
-        if SMAppService.mainApp.status != .enabled {
-            do {
-                try SMAppService.mainApp.register()
-            } catch {
-                log.error("Failed to register login item: \(error)")
-            }
+    /// Register as a login item once, on first launch — the whole point of
+    /// the app is to be always-on. macOS notifies the user and lists it under
+    /// System Settings → General → Login Items, which is the canonical place
+    /// to turn it off; we never touch the registration again, so a choice
+    /// made there is always respected.
+    private func registerLoginItemOnce() {
+        let key = "didRegisterLoginItem"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        do {
+            try SMAppService.mainApp.register()
+        } catch {
+            log.error("Failed to register login item: \(error)")
         }
     }
 
     func handlePermissionLost() {
-        log.error("Input Monitoring permission lost — event tap stopped")
+        log.error("Event tap lost — attempting recovery")
         showStatusWindow()
         startTapWhenTrusted()
     }

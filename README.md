@@ -18,13 +18,13 @@ Download the latest `.dmg` from Releases (or
 `/Applications` folder, and launch it. Grant Input Monitoring permission when
 prompted (required to observe the F12 key globally).
 
-On first launch a status window walks you through granting the permission and
-shows a launch-at-login toggle (on by default — macOS notifies you and lists
-it under System Settings → General → Login Items). Close the window and
-SafariF12 keeps working silently in the background: no menu bar icon, no Dock
-icon. To bring the window back (status, settings, quit), open SafariF12 from
-Launchpad or Finder again while it is running. It also reappears on its own
-if the permission ever goes missing.
+On first launch a status window walks you through granting the permission,
+and SafariF12 registers itself to launch at login (macOS notifies you; turn
+it off anytime under System Settings → General → Login Items). Close the
+window and SafariF12 keeps working silently in the background: no menu bar
+icon, no Dock icon. To bring the window back (status, quit), open SafariF12
+from Launchpad or Finder again while it is running. It also reappears on its
+own if the permission ever goes missing.
 
 ## Build from source
 

@@ -18,24 +18,6 @@ final class F12Tap {
         tap.map { CGEvent.tapIsEnabled(tap: $0) } ?? false
     }
 
-    /// The only reliable authorization check: tap creation performs a fresh
-    /// TCC lookup, while AXIsProcessTrusted() and tapIsEnabled() can both
-    /// report stale values after the permission entry is deleted.
-    static func probeAuthorization() -> Bool {
-        let mask: CGEventMask = 1 << CGEventType.keyDown.rawValue
-        guard let probe = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .listenOnly,
-            eventsOfInterest: mask,
-            callback: { _, _, event, _ in Unmanaged.passRetained(event) },
-            userInfo: nil
-        ) else { return false }
-        CGEvent.tapEnable(tap: probe, enable: false)
-        CFMachPortInvalidate(probe)
-        return true
-    }
-
     func start() -> Bool {
         guard tap == nil else { return true }
         let mask: CGEventMask = 1 << CGEventType.keyDown.rawValue

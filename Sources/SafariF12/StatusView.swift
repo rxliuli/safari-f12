@@ -1,12 +1,10 @@
 import IOKit.hid
-import ServiceManagement
 import SwiftUI
 
 struct StatusView: View {
     @State private var granted =
         IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
     @State private var tapRunning = F12Tap.shared.isRunning
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -40,15 +38,6 @@ struct StatusView: View {
                     }
                 }
                 .padding(.vertical, 4)
-
-                Divider()
-
-                Toggle("Launch at login", isOn: $launchAtLogin)
-                    .toggleStyle(.switch)
-                    .padding(.vertical, 4)
-                    .onChange(of: launchAtLogin) { enabled in
-                        setLaunchAtLogin(enabled)
-                    }
             }
 
             if tapRunning {
@@ -75,7 +64,6 @@ struct StatusView: View {
         .onReceive(timer) { _ in
             granted = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
             tapRunning = F12Tap.shared.isRunning
-            launchAtLogin = SMAppService.mainApp.status == .enabled
         }
     }
 
@@ -84,21 +72,6 @@ struct StatusView: View {
         if let url = URL(
             string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
             NSWorkspace.shared.open(url)
-        }
-    }
-
-    private func setLaunchAtLogin(_ enabled: Bool) {
-        let current = SMAppService.mainApp.status == .enabled
-        guard enabled != current else { return }
-        do {
-            if enabled {
-                try SMAppService.mainApp.register()
-            } else {
-                try SMAppService.mainApp.unregister()
-            }
-            UserDefaults.standard.set(!enabled, forKey: AppDelegate.userDisabledLoginKey)
-        } catch {
-            launchAtLogin = current
         }
     }
 }
