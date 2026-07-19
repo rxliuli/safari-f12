@@ -27,7 +27,9 @@ struct StatusView: View {
                 HStack {
                     Text("Accessibility permission")
                     Spacer()
-                    if trusted {
+                    // `trusted` can be stale after a revocation, so only show
+                    // the checkmark when the tap is actually alive.
+                    if trusted && tapRunning {
                         Label("Granted", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                     } else {
@@ -51,6 +53,11 @@ struct StatusView: View {
             if tapRunning {
                 Label("Running — you can close this window", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
+            } else if trusted {
+                Label(
+                    "Permission looks revoked — toggle SafariF12 off and on in System Settings",
+                    systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
             } else {
                 Label("Waiting for Accessibility permission…", systemImage: "hourglass")
                     .foregroundStyle(.orange)

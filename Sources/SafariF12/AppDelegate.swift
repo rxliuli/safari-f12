@@ -93,7 +93,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func handlePermissionLost() {
         log.error("Accessibility permission lost — event tap stopped")
         showStatusWindow()
-        startTapWhenTrusted()
+        // Slow retry: AXIsProcessTrusted() may keep returning a stale `true`
+        // after revocation, so each attempt can briefly recreate the tap and
+        // lose the fight again. A 15s cadence keeps that harmless; once the
+        // permission is actually re-granted an attempt succeeds and stays up.
+        permissionTimer?.invalidate()
+        permissionTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] timer in
+            guard AXIsProcessTrusted(), F12Tap.shared.start() else { return }
+            timer.invalidate()
+            self?.permissionTimer = nil
+        }
     }
 
     private func startTapWhenTrusted() {

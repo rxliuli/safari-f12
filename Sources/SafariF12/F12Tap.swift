@@ -1,13 +1,15 @@
 import AppKit
+import ApplicationServices
 import os.log
 
 /// Global CGEvent tap: while Safari is frontmost, swallows F12 and sends
 /// ⌥⌘I to toggle the Web Inspector.
 final class F12Tap {
     static let shared = F12Tap()
-    private static let log = Logger(subsystem: "com.rxliuli.safari-f12", category: "tap")
+    static let log = Logger(subsystem: "com.rxliuli.safari-f12", category: "tap")
 
     fileprivate var tap: CFMachPort?
+    fileprivate var recentDisables: [Date] = []
     private var runLoopSource: CFRunLoopSource?
 
     var isRunning: Bool { tap != nil }
@@ -31,7 +33,8 @@ final class F12Tap {
         self.runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        Self.log.info("Event tap started")
+        recentDisables = []
+        Self.log.notice("Event tap started")
         return true
     }
 
@@ -47,7 +50,8 @@ final class F12Tap {
         CFMachPortInvalidate(tap)
         self.tap = nil
         self.runLoopSource = nil
-        Self.log.info("Event tap stopped")
+        self.recentDisables = []
+        Self.log.notice("Event tap stopped")
     }
 }
 
@@ -74,19 +78,29 @@ private func eventTapCallback(
     userInfo: UnsafeMutableRawPointer?
 ) -> Unmanaged<CGEvent>? {
     // The system disables taps that are slow or when secure input kicks in;
-    // re-enable so F12 keeps working afterwards — but ONLY while we are still
-    // authorized. Re-enabling after the permission was revoked wedges the
-    // system-wide keyboard pipeline (system disables, we re-enable, repeat)
-    // until the process dies. In that case tear down and wait instead.
+    // re-enabling keeps F12 working afterwards. BUT: after the Accessibility
+    // permission is revoked, the system disables the tap every time we
+    // re-enable it, and AXIsProcessTrusted() keeps returning a stale `true`
+    // in the running process — so authorization cannot be queried, only
+    // observed behaviorally. Repeated disables in a short window mean the
+    // system is fighting us; keeping that fight up wedges the system-wide
+    // keyboard pipeline. Give up, tear down, and let the app retry slowly.
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-        if AXIsProcessTrusted() {
-            if let tap = F12Tap.shared.tap {
-                CGEvent.tapEnable(tap: tap, enable: true)
-            }
-        } else {
+        let tap = F12Tap.shared
+        let now = Date()
+        tap.recentDisables = tap.recentDisables.filter { now.timeIntervalSince($0) < 5 }
+        tap.recentDisables.append(now)
+
+        if tap.recentDisables.count >= 3 {
+            F12Tap.log.error("Event tap disabled 3x within 5s — permission likely revoked, giving up")
             DispatchQueue.main.async {
                 F12Tap.shared.stop()
                 (NSApp.delegate as? AppDelegate)?.handlePermissionLost()
+            }
+        } else {
+            F12Tap.log.notice("Event tap disabled by system — re-enabling")
+            if let port = tap.tap {
+                CGEvent.tapEnable(tap: port, enable: true)
             }
         }
         return Unmanaged.passRetained(event)
