@@ -37,6 +37,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         }
 
+        // A manual launch (Finder/Launchpad) should visibly do something when
+        // everything is already healthy — show the window. Login-item
+        // launches carry the launched-as-login-item marker and stay silent.
+        let event = NSAppleEventManager.shared().currentAppleEvent
+        let launchedAtLogin = event?.eventID == AEEventID(kAEOpenApplication)
+            && event?.paramDescriptor(forKeyword: AEKeyword(keyAEPropData))?.enumCodeValue
+                == OSType(keyAELaunchedAsLogInItem)
+        if !launchedAtLogin, F12Tap.shared.isRunning, AXIsProcessTrusted() {
+            showStatusWindow(activate: true)
+        }
+
         log.info("Application started")
     }
 
