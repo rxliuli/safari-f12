@@ -17,11 +17,13 @@ Download the latest `.dmg` from Releases (or
 `/Applications` folder, and launch it. Grant Accessibility permission when
 prompted (required for the global keyboard event tap).
 
-SafariF12 registers itself to launch at login — macOS notifies you and lists
-it under System Settings → General → Login Items, and the menu bar toggle
-turns it off anytime. Prefer total silence? Pick **Hide Menu Bar Icon** from
-the menu; the app keeps working in the background. To bring the icon back,
-open SafariF12 from Finder or Launchpad again while it is running.
+On first launch a status window walks you through granting the permission and
+shows a launch-at-login toggle (on by default — macOS notifies you and lists
+it under System Settings → General → Login Items). Close the window and
+SafariF12 keeps working silently in the background: no menu bar icon, no Dock
+icon. To bring the window back (status, settings, quit), open SafariF12 from
+Launchpad or Finder again while it is running. It also reappears on its own
+if the permission ever goes missing.
 
 ## Build from source
 
