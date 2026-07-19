@@ -81,6 +81,7 @@ jobs:
 
       - name: Create DMG
         run: |
+          brew untap aws/tap 2>/dev/null || true
           brew install create-dmg
           create-dmg \
             --volname "SafariF12" \
@@ -107,7 +108,7 @@ jobs:
 
           xcrun stapler staple "SafariF12-macos.dmg"
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: SafariF12-macos
           path: SafariF12-macos.dmg
@@ -122,7 +123,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
