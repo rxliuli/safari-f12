@@ -25,11 +25,10 @@ struct StatusView: View {
             }
 
             GroupBox {
-                // Sending ⌥⌘I needs Accessibility (granted instantly);
-                // hearing F12 needs Input Monitoring (macOS suggests a quit &
-                // reopen when enabled) — so guide in that order.
+                // Accessibility covers everything (observing F12 and posting
+                // ⌥⌘I) in the normal case.
                 HStack {
-                    Text("1. Accessibility")
+                    Text("Accessibility")
                     Spacer()
                     if axGranted {
                         Label("Granted", systemImage: "checkmark.circle.fill")
@@ -42,23 +41,20 @@ struct StatusView: View {
                 }
                 .padding(.vertical, 4)
 
-                Divider()
+                // Shown only when an explicit Input Monitoring deny record is
+                // overriding the Accessibility fallback (legacy installs).
+                if axGranted && !tapRunning {
+                    Divider()
 
-                HStack {
-                    Text("2. Input Monitoring")
-                    Spacer()
-                    // `imGranted` can be stale, so only show the checkmark
-                    // when the tap is actually alive.
-                    if imGranted && tapRunning {
-                        Label("Granted", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                    } else {
+                    HStack {
+                        Text("Input Monitoring")
+                        Spacer()
                         Button("Open System Settings") {
                             requestInputMonitoring()
                         }
                     }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
             }
 
             if tapRunning && axGranted {
