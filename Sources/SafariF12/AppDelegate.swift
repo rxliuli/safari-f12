@@ -19,13 +19,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         autoRegisterLoginItem()
         startTapWhenTrusted()
 
-        // Watchdog: notice when the tap died behind our back (permission
-        // revoked, tap disabled without a callback) and fall back to the
-        // waiting state. The tap is listen-only so this is about restoring
-        // F12, not about system safety.
+        // Watchdog: notice when the tap died behind our back. Deleting the
+        // permission entry can leave the tap "enabled" with stale trust
+        // values, so the probe (a fresh tap creation) is the authority. The
+        // tap is listen-only, so this is about restoring F12, not safety.
         watchdogTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             guard F12Tap.shared.isRunning else { return }
-            if !AXIsProcessTrusted() || !F12Tap.shared.isEnabled {
+            if !F12Tap.shared.isEnabled || !F12Tap.probeAuthorization() {
                 F12Tap.shared.stop()
                 self?.handlePermissionLost()
             }
@@ -101,30 +101,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func handlePermissionLost() {
         log.error("Accessibility permission lost — event tap stopped")
         showStatusWindow()
-        // Slow retry: AXIsProcessTrusted() may keep returning a stale `true`
-        // after revocation, so each attempt can briefly recreate the tap and
-        // lose the fight again. A 15s cadence keeps that harmless; once the
-        // permission is actually re-granted an attempt succeeds and stays up.
-        permissionTimer?.invalidate()
-        permissionTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] timer in
-            guard AXIsProcessTrusted(), F12Tap.shared.start() else { return }
-            timer.invalidate()
-            self?.permissionTimer = nil
-        }
+        startTapWhenTrusted()
     }
 
     private func startTapWhenTrusted() {
         permissionTimer?.invalidate()
         permissionTimer = nil
-        if AXIsProcessTrusted(), F12Tap.shared.start() {
+        // Tap creation is itself the authorization check — trust it, not
+        // AXIsProcessTrusted(), which can be stale in both directions.
+        if F12Tap.shared.start() {
             return
         }
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         AXIsProcessTrustedWithOptions(options as CFDictionary)
-        // Keep polling until the tap is actually running — permission can be
-        // granted while tap creation still fails transiently right after.
-        permissionTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
-            guard AXIsProcessTrusted(), F12Tap.shared.start() else { return }
+        permissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
+            guard F12Tap.shared.start() else { return }
             timer.invalidate()
             self?.permissionTimer = nil
         }
