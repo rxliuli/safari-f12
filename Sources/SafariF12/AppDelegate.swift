@@ -24,17 +24,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func startTapWhenTrusted() {
-        if AXIsProcessTrusted() {
-            _ = F12Tap.shared.start()
+        if AXIsProcessTrusted(), F12Tap.shared.start() {
             return
         }
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         AXIsProcessTrustedWithOptions(options as CFDictionary)
+        // Keep polling until the tap is actually running — permission can be
+        // granted while tap creation still fails transiently right after.
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
-            guard AXIsProcessTrusted() else { return }
+            guard AXIsProcessTrusted(), F12Tap.shared.start() else { return }
             timer.invalidate()
             self?.permissionTimer = nil
-            _ = F12Tap.shared.start()
         }
     }
 
