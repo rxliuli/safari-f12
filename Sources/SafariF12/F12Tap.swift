@@ -8,6 +8,7 @@ final class F12Tap {
     private static let log = Logger(subsystem: "com.rxliuli.safari-f12", category: "tap")
 
     fileprivate var tap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
 
     var isRunning: Bool { tap != nil }
 
@@ -27,10 +28,26 @@ final class F12Tap {
         }
         self.tap = tap
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        self.runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
         Self.log.info("Event tap started")
         return true
+    }
+
+    /// Tear the tap down completely. Critical when Accessibility permission is
+    /// revoked: an active tap kept alive without authorization blocks the
+    /// system-wide keyboard event pipeline.
+    func stop() {
+        guard let tap else { return }
+        CGEvent.tapEnable(tap: tap, enable: false)
+        if let runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+        }
+        CFMachPortInvalidate(tap)
+        self.tap = nil
+        self.runLoopSource = nil
+        Self.log.info("Event tap stopped")
     }
 }
 
@@ -57,10 +74,20 @@ private func eventTapCallback(
     userInfo: UnsafeMutableRawPointer?
 ) -> Unmanaged<CGEvent>? {
     // The system disables taps that are slow or when secure input kicks in;
-    // re-enable so F12 keeps working afterwards.
+    // re-enable so F12 keeps working afterwards — but ONLY while we are still
+    // authorized. Re-enabling after the permission was revoked wedges the
+    // system-wide keyboard pipeline (system disables, we re-enable, repeat)
+    // until the process dies. In that case tear down and wait instead.
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-        if let tap = F12Tap.shared.tap {
-            CGEvent.tapEnable(tap: tap, enable: true)
+        if AXIsProcessTrusted() {
+            if let tap = F12Tap.shared.tap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+            }
+        } else {
+            DispatchQueue.main.async {
+                F12Tap.shared.stop()
+                (NSApp.delegate as? AppDelegate)?.handlePermissionLost()
+            }
         }
         return Unmanaged.passRetained(event)
     }

@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private var statusWindow: NSWindow?
     private var permissionTimer: Timer?
+    private var watchdogTimer: Timer?
     private let log = Logger(subsystem: "com.rxliuli.safari-f12", category: "app")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -17,6 +18,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         autoRegisterLoginItem()
         startTapWhenTrusted()
+
+        // Watchdog: if the permission is revoked while the tap is alive, tear
+        // it down within seconds — an unauthorized active tap blocks keyboard
+        // input system-wide, and no callback is guaranteed to tell us.
+        watchdogTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            if F12Tap.shared.isRunning, !AXIsProcessTrusted() {
+                F12Tap.shared.stop()
+                self?.handlePermissionLost()
+            }
+        }
 
         // Show the status window on first launch, or whenever the permission
         // is missing (e.g. revoked or invalidated by an update). Otherwise
@@ -79,7 +90,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
+    func handlePermissionLost() {
+        log.error("Accessibility permission lost — event tap stopped")
+        showStatusWindow()
+        startTapWhenTrusted()
+    }
+
     private func startTapWhenTrusted() {
+        permissionTimer?.invalidate()
+        permissionTimer = nil
         if AXIsProcessTrusted(), F12Tap.shared.start() {
             return
         }
