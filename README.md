@@ -13,20 +13,31 @@ Safari → Settings → Advanced → check **"Show features for web developers"*
 
 ## Install
 
-Download the latest `.dmg` from Releases (or
-`brew install --cask rxliuli/tap/safari-f12`), drag `SafariF12.app` to your
-`/Applications` folder, and launch it. Grant **Accessibility** when prompted —
-it covers both observing the F12 key and sending the synthetic ⌥⌘I. (In rare
-cases macOS additionally asks for **Input Monitoring**; the status window
-guides you if so.)
+### Homebrew
 
-On first launch a status window walks you through granting the permission,
-and SafariF12 registers itself to launch at login (macOS notifies you; turn
-it off anytime under System Settings → General → Login Items). Close the
-window and SafariF12 keeps working silently in the background: no menu bar
-icon, no Dock icon. To bring the window back (status, quit), open SafariF12
-from Launchpad or Finder again while it is running. It also reappears on its
-own if the permission ever goes missing.
+```bash
+brew install --cask rxliuli/tap/safari-f12
+```
+
+### Download
+
+Grab the latest `.dmg` from
+[Releases](https://github.com/rxliuli/safari-f12/releases), open it, and drag
+`SafariF12.app` to your `/Applications` folder.
+
+## First launch
+
+Launch SafariF12 and grant **Accessibility** when prompted — it covers both
+observing the F12 key and sending the synthetic ⌥⌘I. (In rare cases macOS
+additionally asks for **Input Monitoring**; the status window guides you if
+so.)
+
+SafariF12 registers itself to launch at login (macOS notifies you; turn it
+off anytime under System Settings → General → Login Items) and then works
+silently in the background: no menu bar icon, no Dock icon. To bring the
+status window back (status, quit), open SafariF12 from Launchpad or Finder
+again while it is running. It also reappears on its own if the permission
+ever goes missing.
 
 ## Build from source
 
