@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import IOKit.hid
 import ServiceManagement
 import SwiftUI
@@ -28,13 +29,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self?.handlePermissionLost()
         }
 
-        // Show the status window on first launch, or whenever the tap is not
-        // actually running (permission missing/revoked). Otherwise stay fully
-        // in the background.
+        // Show the status window on first launch, or whenever something is
+        // missing (tap not running / Accessibility revoked). Otherwise stay
+        // fully in the background. Launch-time shows must not steal focus —
+        // the system permission dialogs need to stay on top.
         let firstLaunch = !UserDefaults.standard.bool(forKey: hasLaunchedKey)
         UserDefaults.standard.set(true, forKey: hasLaunchedKey)
-        if firstLaunch || !F12Tap.shared.isRunning {
-            showStatusWindow()
+        if firstLaunch || !F12Tap.shared.isRunning || !AXIsProcessTrusted() {
+            showStatusWindow(activate: false)
         }
 
         log.info("Application started")
@@ -48,11 +50,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             F12Tap.shared.stop()
         }
         startTapWhenTrusted()
-        showStatusWindow()
+        showStatusWindow(activate: true)
         return false
     }
 
-    private func showStatusWindow() {
+    private func showStatusWindow(activate: Bool) {
         if statusWindow == nil {
             let window = NSWindow(
                 contentRect: .zero,
@@ -71,8 +73,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.center()
             statusWindow = window
         }
-        NSApp.activate(ignoringOtherApps: true)
-        statusWindow?.makeKeyAndOrderFront(nil)
+        if activate {
+            NSApp.activate(ignoringOtherApps: true)
+            statusWindow?.makeKeyAndOrderFront(nil)
+        } else {
+            statusWindow?.orderFrontRegardless()
+        }
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -97,16 +103,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func handlePermissionLost() {
         log.error("Event tap lost — attempting recovery")
-        showStatusWindow()
+        showStatusWindow(activate: false)
         startTapWhenTrusted()
+    }
+
+    /// Posting the synthetic ⌥⌘I needs Accessibility (separate from Input
+    /// Monitoring, which only covers listening). Requested after the tap is
+    /// up so the two system prompts don't stack on top of each other.
+    private func requestAccessibilityIfNeeded() {
+        guard !AXIsProcessTrusted() else { return }
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
 
     private func startTapWhenTrusted() {
         permissionTimer?.invalidate()
         permissionTimer = nil
         // Tap creation is itself the authorization check — trust it, not
-        // AXIsProcessTrusted(), which can be stale in both directions.
+        // the query APIs, which can be stale in both directions.
         if F12Tap.shared.start() {
+            requestAccessibilityIfNeeded()
             return
         }
         // Listen-only keyboard taps are governed by Input Monitoring
@@ -118,6 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 timer.invalidate()
                 self?.permissionTimer = nil
                 UserDefaults.standard.set(0, forKey: "autoRelaunchCount")
+                self?.requestAccessibilityIfNeeded()
                 return
             }
             // If TCC claims we are granted but tap creation still fails, the

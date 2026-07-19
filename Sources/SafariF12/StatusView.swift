@@ -1,9 +1,11 @@
+import ApplicationServices
 import IOKit.hid
 import SwiftUI
 
 struct StatusView: View {
-    @State private var granted =
+    @State private var imGranted =
         IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
+    @State private var axGranted = AXIsProcessTrusted()
     @State private var tapRunning = F12Tap.shared.isRunning
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -23,12 +25,14 @@ struct StatusView: View {
             }
 
             GroupBox {
+                // Hearing F12 needs Input Monitoring; sending ⌥⌘I needs
+                // Accessibility. Both are required.
                 HStack {
-                    Text("Input Monitoring permission")
+                    Text("Input Monitoring")
                     Spacer()
-                    // `granted` can be stale, so only show the checkmark when
-                    // the tap is actually alive.
-                    if granted && tapRunning {
+                    // `imGranted` can be stale, so only show the checkmark
+                    // when the tap is actually alive.
+                    if imGranted && tapRunning {
                         Label("Granted", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                     } else {
@@ -38,18 +42,37 @@ struct StatusView: View {
                     }
                 }
                 .padding(.vertical, 4)
+
+                Divider()
+
+                HStack {
+                    Text("Accessibility")
+                    Spacer()
+                    if axGranted {
+                        Label("Granted", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else {
+                        Button("Open System Settings") {
+                            requestAccessibility()
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
             }
 
-            if tapRunning {
+            if tapRunning && axGranted {
                 Label("Running — you can close this window", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
-            } else if granted {
+            } else if !tapRunning && imGranted {
                 Label(
                     "Permission looks revoked — toggle SafariF12 in System Settings → Input Monitoring",
                     systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
-            } else {
+            } else if !tapRunning {
                 Label("Waiting for Input Monitoring permission…", systemImage: "hourglass")
+                    .foregroundStyle(.orange)
+            } else {
+                Label("Waiting for Accessibility permission…", systemImage: "hourglass")
                     .foregroundStyle(.orange)
             }
 
@@ -62,7 +85,8 @@ struct StatusView: View {
         .padding(24)
         .frame(width: 400)
         .onReceive(timer) { _ in
-            granted = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
+            imGranted = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
+            axGranted = AXIsProcessTrusted()
             tapRunning = F12Tap.shared.isRunning
         }
     }
@@ -71,6 +95,15 @@ struct StatusView: View {
         IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
         if let url = URL(
             string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func requestAccessibility() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        AXIsProcessTrustedWithOptions(options as CFDictionary)
+        if let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
     }
