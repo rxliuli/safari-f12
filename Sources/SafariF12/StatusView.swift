@@ -1,9 +1,10 @@
-import ApplicationServices
+import IOKit.hid
 import ServiceManagement
 import SwiftUI
 
 struct StatusView: View {
-    @State private var trusted = AXIsProcessTrusted()
+    @State private var granted =
+        IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
     @State private var tapRunning = F12Tap.shared.isRunning
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
@@ -25,16 +26,16 @@ struct StatusView: View {
 
             GroupBox {
                 HStack {
-                    Text("Accessibility permission")
+                    Text("Input Monitoring permission")
                     Spacer()
-                    // `trusted` can be stale after a revocation, so only show
-                    // the checkmark when the tap is actually alive.
-                    if trusted && tapRunning {
+                    // `granted` can be stale, so only show the checkmark when
+                    // the tap is actually alive.
+                    if granted && tapRunning {
                         Label("Granted", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                     } else {
                         Button("Open System Settings") {
-                            requestAccessibility()
+                            requestInputMonitoring()
                         }
                     }
                 }
@@ -53,13 +54,13 @@ struct StatusView: View {
             if tapRunning {
                 Label("Running — you can close this window", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
-            } else if trusted {
+            } else if granted {
                 Label(
-                    "Permission looks revoked — toggle SafariF12 off and on in System Settings",
+                    "Permission looks revoked — toggle SafariF12 in System Settings → Input Monitoring",
                     systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
             } else {
-                Label("Waiting for Accessibility permission…", systemImage: "hourglass")
+                Label("Waiting for Input Monitoring permission…", systemImage: "hourglass")
                     .foregroundStyle(.orange)
             }
 
@@ -72,17 +73,16 @@ struct StatusView: View {
         .padding(24)
         .frame(width: 400)
         .onReceive(timer) { _ in
-            trusted = AXIsProcessTrusted()
+            granted = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
             tapRunning = F12Tap.shared.isRunning
             launchAtLogin = SMAppService.mainApp.status == .enabled
         }
     }
 
-    private func requestAccessibility() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        AXIsProcessTrustedWithOptions(options as CFDictionary)
+    private func requestInputMonitoring() {
+        IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
         if let url = URL(
-            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
             NSWorkspace.shared.open(url)
         }
     }

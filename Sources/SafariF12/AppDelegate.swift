@@ -1,5 +1,5 @@
 import AppKit
-import ApplicationServices
+import IOKit.hid
 import ServiceManagement
 import SwiftUI
 import os.log
@@ -31,12 +31,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         }
 
-        // Show the status window on first launch, or whenever the permission
-        // is missing (e.g. revoked or invalidated by an update). Otherwise
-        // stay fully in the background.
+        // Show the status window on first launch, or whenever the tap is not
+        // actually running (permission missing/revoked). Otherwise stay fully
+        // in the background.
         let firstLaunch = !UserDefaults.standard.bool(forKey: hasLaunchedKey)
         UserDefaults.standard.set(true, forKey: hasLaunchedKey)
-        if firstLaunch || !AXIsProcessTrusted() {
+        if firstLaunch || !F12Tap.shared.isRunning {
             showStatusWindow()
         }
 
@@ -99,7 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func handlePermissionLost() {
-        log.error("Accessibility permission lost — event tap stopped")
+        log.error("Input Monitoring permission lost — event tap stopped")
         showStatusWindow()
         startTapWhenTrusted()
     }
@@ -112,8 +112,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if F12Tap.shared.start() {
             return
         }
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        AXIsProcessTrustedWithOptions(options as CFDictionary)
+        // Listen-only keyboard taps are governed by Input Monitoring
+        // (kTCCServiceListenEvent), not Accessibility.
+        IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
         var contradictions = 0
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
             if F12Tap.shared.start() {
@@ -122,11 +123,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 UserDefaults.standard.set(0, forKey: "autoRelaunchCount")
                 return
             }
-            // Deleting the TCC entry poisons the running process: after a
-            // re-grant, tap creation keeps failing here forever while
-            // AXIsProcessTrusted reports true. That contradiction is only
-            // resolvable by a fresh process — relaunch ourselves.
-            if AXIsProcessTrusted() {
+            // If TCC claims we are granted but tap creation still fails, the
+            // process's TCC state is stale — only a fresh process resolves it.
+            if IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted {
                 contradictions += 1
                 if contradictions >= 2 {
                     self?.relaunchIfAllowed()

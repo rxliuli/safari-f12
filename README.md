@@ -15,8 +15,8 @@ Safari → Settings → Advanced → check **"Show features for web developers"*
 
 Download the latest `.dmg` from Releases (or
 `brew install --cask rxliuli/tap/safari-f12`), drag `SafariF12.app` to your
-`/Applications` folder, and launch it. Grant Accessibility permission when
-prompted (required for the global keyboard event tap).
+`/Applications` folder, and launch it. Grant Input Monitoring permission when
+prompted (required to observe the F12 key globally).
 
 On first launch a status window walks you through granting the permission and
 shows a launch-at-login toggle (on by default — macOS notifies you and lists

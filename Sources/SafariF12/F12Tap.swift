@@ -41,7 +41,7 @@ final class F12Tap {
         let mask: CGEventMask = 1 << CGEventType.keyDown.rawValue
         // .listenOnly is a hard safety requirement, not an optimization: an
         // ACTIVE tap sits synchronously in the system keyboard pipeline, and
-        // when the Accessibility permission is revoked mid-flight the system
+        // when the permission is revoked mid-flight the system
         // can leave it enabled-but-unauthorized, freezing input system-wide
         // until this process dies. A listen-only tap observes asynchronously
         // and can never block delivery, no matter how it fails. The cost:
@@ -67,7 +67,7 @@ final class F12Tap {
         return true
     }
 
-    /// Tear the tap down completely. Critical when Accessibility permission is
+    /// Tear the tap down completely. Critical when the Input Monitoring permission is
     /// revoked: an active tap kept alive without authorization blocks the
     /// system-wide keyboard event pipeline.
     func stop() {
@@ -107,7 +107,7 @@ private func eventTapCallback(
     userInfo: UnsafeMutableRawPointer?
 ) -> Unmanaged<CGEvent>? {
     // The system disables taps that are slow or when secure input kicks in;
-    // re-enabling keeps F12 working afterwards. BUT: after the Accessibility
+    // re-enabling keeps F12 working afterwards. BUT: after the
     // permission is revoked, the system disables the tap every time we
     // re-enable it, and AXIsProcessTrusted() keeps returning a stale `true`
     // in the running process — so authorization cannot be queried, only
