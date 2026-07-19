@@ -25,10 +25,27 @@ struct StatusView: View {
             }
 
             GroupBox {
-                // Hearing F12 needs Input Monitoring; sending ⌥⌘I needs
-                // Accessibility. Both are required.
+                // Sending ⌥⌘I needs Accessibility (granted instantly);
+                // hearing F12 needs Input Monitoring (macOS suggests a quit &
+                // reopen when enabled) — so guide in that order.
                 HStack {
-                    Text("Input Monitoring")
+                    Text("1. Accessibility")
+                    Spacer()
+                    if axGranted {
+                        Label("Granted", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else {
+                        Button("Open System Settings") {
+                            requestAccessibility()
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+
+                Divider()
+
+                HStack {
+                    Text("2. Input Monitoring")
                     Spacer()
                     // `imGranted` can be stale, so only show the checkmark
                     // when the tap is actually alive.
@@ -42,37 +59,21 @@ struct StatusView: View {
                     }
                 }
                 .padding(.vertical, 4)
-
-                Divider()
-
-                HStack {
-                    Text("Accessibility")
-                    Spacer()
-                    if axGranted {
-                        Label("Granted", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                    } else {
-                        Button("Open System Settings") {
-                            requestAccessibility()
-                        }
-                    }
-                }
-                .padding(.vertical, 4)
             }
 
             if tapRunning && axGranted {
                 Label("Running — you can close this window", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
-            } else if !tapRunning && imGranted {
+            } else if !axGranted {
+                Label("Waiting for Accessibility permission…", systemImage: "hourglass")
+                    .foregroundStyle(.orange)
+            } else if imGranted {
                 Label(
                     "Permission looks revoked — toggle SafariF12 in System Settings → Input Monitoring",
                     systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
-            } else if !tapRunning {
-                Label("Waiting for Input Monitoring permission…", systemImage: "hourglass")
-                    .foregroundStyle(.orange)
             } else {
-                Label("Waiting for Accessibility permission…", systemImage: "hourglass")
+                Label("Waiting for Input Monitoring permission…", systemImage: "hourglass")
                     .foregroundStyle(.orange)
             }
 

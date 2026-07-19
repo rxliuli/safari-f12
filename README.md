@@ -16,8 +16,10 @@ Safari → Settings → Advanced → check **"Show features for web developers"*
 Download the latest `.dmg` from Releases (or
 `brew install --cask rxliuli/tap/safari-f12`), drag `SafariF12.app` to your
 `/Applications` folder, and launch it. Two permissions are needed and
-prompted for in order: **Input Monitoring** (to observe the F12 key) and
-**Accessibility** (to send the synthetic ⌥⌘I to Safari).
+prompted for in order: **Accessibility** (to send the synthetic ⌥⌘I to
+Safari), then **Input Monitoring** (to observe the F12 key). When macOS
+offers "Quit & Reopen" after enabling Input Monitoring, take it — that's
+the last step, and SafariF12 comes back fully working.
 
 On first launch a status window walks you through granting the permission,
 and SafariF12 registers itself to launch at login (macOS notifies you; turn

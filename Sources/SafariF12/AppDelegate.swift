@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         registerLoginItemOnce()
-        startTapWhenTrusted()
+        beginSetup()
 
         // Keepalive: recover if the tap ended up disabled without a callback
         // telling us (sleep/wake, secure input edge cases). Permission state
@@ -47,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if F12Tap.shared.isRunning {
             F12Tap.shared.stop()
         }
-        startTapWhenTrusted()
+        beginSetup()
         showStatusWindow(activate: true)
         return false
     }
@@ -102,38 +102,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func handlePermissionLost() {
         log.error("Event tap lost — attempting recovery")
         showStatusWindow(activate: false)
-        startTapWhenTrusted()
+        beginSetup()
     }
 
-    /// Posting the synthetic ⌥⌘I needs Accessibility (separate from Input
-    /// Monitoring, which only covers listening). Requested after the tap is
-    /// up so the two system prompts appear in sequence — and never while our
-    /// own window is visible, whose button is the guide then.
-    private func requestAccessibilityIfNeeded() {
-        guard !AXIsProcessTrusted(), statusWindow == nil else { return }
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        AXIsProcessTrustedWithOptions(options as CFDictionary)
+    /// Permission sequence: Accessibility first (needed to post ⌥⌘I; grants
+    /// apply instantly with no dialogs), Input Monitoring last — enabling it
+    /// makes macOS show a "Quit & Reopen" dialog, so it doubles as the final
+    /// step: after the relaunch everything is already in place. Automatic
+    /// system prompts are suppressed while our own window is visible — its
+    /// buttons are the guide then.
+    private func beginSetup() {
+        permissionTimer?.invalidate()
+        permissionTimer = nil
+        if AXIsProcessTrusted() {
+            beginTapSetup()
+            return
+        }
+        if statusWindow == nil {
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+            AXIsProcessTrustedWithOptions(options as CFDictionary)
+        }
+        permissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
+            guard AXIsProcessTrusted() else { return }
+            timer.invalidate()
+            self?.permissionTimer = nil
+            self?.beginTapSetup()
+        }
     }
 
-    private func startTapWhenTrusted() {
+    private func beginTapSetup() {
         permissionTimer?.invalidate()
         permissionTimer = nil
         // Tap creation is itself the authorization check — trust it, not
         // the query APIs, which can be stale in both directions.
         if F12Tap.shared.start() {
-            requestAccessibilityIfNeeded()
+            UserDefaults.standard.set(0, forKey: "autoRelaunchCount")
             return
         }
-        // Listen-only keyboard taps are governed by Input Monitoring
-        // (kTCCServiceListenEvent), not Accessibility.
-        IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+        if statusWindow == nil {
+            IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+        }
         var contradictions = 0
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] timer in
             if F12Tap.shared.start() {
                 timer.invalidate()
                 self?.permissionTimer = nil
                 UserDefaults.standard.set(0, forKey: "autoRelaunchCount")
-                self?.requestAccessibilityIfNeeded()
                 return
             }
             // If TCC claims we are granted but tap creation still fails, the
