@@ -6,8 +6,6 @@ import SwiftUI
 import os.log
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
-    private let hasLaunchedKey = "hasLaunchedBefore"
-
     private var statusWindow: NSWindow?
     private var permissionTimer: Timer?
     private var watchdogTimer: Timer?
@@ -29,14 +27,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self?.handlePermissionLost()
         }
 
-        // Show the status window on first launch, or whenever something is
-        // missing (tap not running / Accessibility revoked). Otherwise stay
-        // fully in the background. Launch-time shows must not steal focus —
-        // the system permission dialogs need to stay on top.
-        let firstLaunch = !UserDefaults.standard.bool(forKey: hasLaunchedKey)
-        UserDefaults.standard.set(true, forKey: hasLaunchedKey)
-        if firstLaunch || !F12Tap.shared.isRunning || !AXIsProcessTrusted() {
-            showStatusWindow(activate: false)
+        // At launch the system permission dialogs own the stage — never show
+        // our own window next to them (any ordering call puts it on top of
+        // them). It appears only as a fallback, once the dialogs are long
+        // gone, if setup still isn't complete.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+            if !(F12Tap.shared.isRunning && AXIsProcessTrusted()) {
+                self?.showStatusWindow(activate: false)
+            }
         }
 
         log.info("Application started")
@@ -109,9 +107,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     /// Posting the synthetic ⌥⌘I needs Accessibility (separate from Input
     /// Monitoring, which only covers listening). Requested after the tap is
-    /// up so the two system prompts don't stack on top of each other.
+    /// up so the two system prompts appear in sequence — and never while our
+    /// own window is visible, whose button is the guide then.
     private func requestAccessibilityIfNeeded() {
-        guard !AXIsProcessTrusted() else { return }
+        guard !AXIsProcessTrusted(), statusWindow == nil else { return }
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
