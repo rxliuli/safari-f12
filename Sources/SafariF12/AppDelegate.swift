@@ -1,55 +1,71 @@
 import AppKit
 import ApplicationServices
 import ServiceManagement
+import SwiftUI
 import os.log
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
-    private var statusItem: NSStatusItem?
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    static let userDisabledLoginKey = "userDisabledLaunchAtLogin"
+    private let hasLaunchedKey = "hasLaunchedBefore"
+
+    private var statusWindow: NSWindow?
     private var permissionTimer: Timer?
     private let log = Logger(subsystem: "com.rxliuli.safari-f12", category: "app")
-
-    private let hideIconKey = "hideMenuBarIcon"
-    private let userDisabledLoginKey = "userDisabledLaunchAtLogin"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
         autoRegisterLoginItem()
+        startTapWhenTrusted()
 
-        if !UserDefaults.standard.bool(forKey: hideIconKey) {
-            setUpStatusItem()
+        // Show the status window on first launch, or whenever the permission
+        // is missing (e.g. revoked or invalidated by an update). Otherwise
+        // stay fully in the background.
+        let firstLaunch = !UserDefaults.standard.bool(forKey: hasLaunchedKey)
+        UserDefaults.standard.set(true, forKey: hasLaunchedKey)
+        if firstLaunch || !AXIsProcessTrusted() {
+            showStatusWindow()
         }
 
-        startTapWhenTrusted()
         log.info("Application started")
     }
 
-    // Launching the app again while it is running brings the icon back.
+    // Opening the app again while it is running brings the window back.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        if statusItem == nil {
-            UserDefaults.standard.set(false, forKey: hideIconKey)
-            setUpStatusItem()
-        }
+        showStatusWindow()
         return false
     }
 
-    private func setUpStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(
-            systemSymbolName: "safari", accessibilityDescription: "SafariF12")
-        let menu = NSMenu()
-        menu.delegate = self
-        item.menu = menu
-        statusItem = item
+    private func showStatusWindow() {
+        if statusWindow == nil {
+            let window = NSWindow(
+                contentRect: .zero,
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = "SafariF12"
+            window.contentViewController = NSHostingController(rootView: StatusView())
+            window.isReleasedWhenClosed = false
+            window.delegate = self
+            window.center()
+            statusWindow = window
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        statusWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        statusWindow = nil
     }
 
     /// Register as a login item on behalf of the user — the whole point of the
     /// app is to be always-on. macOS shows a "background items added"
     /// notification and lists it in System Settings, so this is transparent
     /// and revocable. Never re-registers after the user explicitly turned the
-    /// menu toggle off.
+    /// toggle off.
     private func autoRegisterLoginItem() {
-        guard !UserDefaults.standard.bool(forKey: userDisabledLoginKey) else { return }
+        guard !UserDefaults.standard.bool(forKey: Self.userDisabledLoginKey) else { return }
         if SMAppService.mainApp.status != .enabled {
             do {
                 try SMAppService.mainApp.register()
@@ -72,66 +88,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             timer.invalidate()
             self?.permissionTimer = nil
         }
-    }
-
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        menu.removeAllItems()
-
-        let status = NSMenuItem(
-            title: F12Tap.shared.isRunning
-                ? "F12 toggles Web Inspector in Safari"
-                : "Waiting for Accessibility permission…",
-            action: nil, keyEquivalent: "")
-        status.isEnabled = false
-        menu.addItem(status)
-
-        menu.addItem(.separator())
-
-        let launchAtLogin = NSMenuItem(
-            title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
-        launchAtLogin.target = self
-        launchAtLogin.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        menu.addItem(launchAtLogin)
-
-        let hideIcon = NSMenuItem(
-            title: "Hide Menu Bar Icon", action: #selector(hideMenuBarIcon), keyEquivalent: "")
-        hideIcon.target = self
-        menu.addItem(hideIcon)
-
-        menu.addItem(.separator())
-
-        let quit = NSMenuItem(
-            title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        menu.addItem(quit)
-    }
-
-    @objc private func toggleLaunchAtLogin() {
-        do {
-            if SMAppService.mainApp.status == .enabled {
-                try SMAppService.mainApp.unregister()
-                UserDefaults.standard.set(true, forKey: userDisabledLoginKey)
-            } else {
-                try SMAppService.mainApp.register()
-                UserDefaults.standard.set(false, forKey: userDisabledLoginKey)
-            }
-        } catch {
-            log.error("Failed to toggle launch at login: \(error)")
-        }
-    }
-
-    @objc private func hideMenuBarIcon() {
-        let alert = NSAlert()
-        alert.messageText = "Hide the menu bar icon?"
-        alert.informativeText =
-            "SafariF12 keeps running in the background. To show the icon again, open SafariF12 from Finder or Launchpad while it is running."
-        alert.addButton(withTitle: "Hide Icon")
-        alert.addButton(withTitle: "Cancel")
-        NSApp.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        UserDefaults.standard.set(true, forKey: hideIconKey)
-        if let statusItem {
-            NSStatusBar.system.removeStatusItem(statusItem)
-        }
-        statusItem = nil
     }
 }
