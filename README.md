@@ -12,9 +12,10 @@ Safari → Settings → Advanced → check **"Show features for web developers"*
 
 ## Install
 
-Download `SafariF12.app` from Releases, move it to `/Applications`, and launch
-it. Grant Accessibility permission when prompted (required for the global
-keyboard event tap). Use the menu bar icon to enable **Launch at Login**.
+Download the latest `.dmg` from Releases, open it, and drag `SafariF12.app`
+to your `/Applications` folder. Launch it and grant Accessibility permission
+when prompted (required for the global keyboard event tap). Use the menu bar
+icon to enable **Launch at Login**.
 
 ## Build from source
 
@@ -33,4 +34,4 @@ SafariF12 works out of the box and only intercepts F12 while Safari is active.
 
 ## License
 
-MIT
+This project is licensed under the [GPL-3.0 License](./LICENSE).
