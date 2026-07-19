@@ -7,6 +7,11 @@ A tiny native background app: while Safari is the frontmost application it
 listens for F12 and sends ⌥⌘I. It does nothing in any other app, and its
 listen-only event tap can never block or delay your keyboard input.
 
+<img src="./docs/status-window.png" alt="SafariF12 status window" width="400" />
+
+_The status window — you only ever see it on first launch, or when you open
+the app again._
+
 ## Prerequisites
 
 Safari → Settings → Advanced → check **"Show features for web developers"**.
