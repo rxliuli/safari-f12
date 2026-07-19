@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'Resources/Info.plist'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -33,7 +34,7 @@ jobs:
             PREVIOUS=$(read_version /tmp/prev.plist || true)
           fi
           echo "version=${CURRENT}" >> "$GITHUB_OUTPUT"
-          if [[ "${CURRENT}" != "${PREVIOUS}" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" || "${CURRENT}" != "${PREVIOUS}" ]]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
