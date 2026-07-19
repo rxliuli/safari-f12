@@ -3,8 +3,9 @@
 Press **F12** in Safari to toggle the Web Inspector — the same muscle memory as
 Chrome and Firefox.
 
-A tiny native menu bar app: while Safari is the frontmost application it
-swallows F12 and sends ⌥⌘I. It does nothing in any other app.
+A tiny native background app: while Safari is the frontmost application it
+listens for F12 and sends ⌥⌘I. It does nothing in any other app, and its
+listen-only event tap can never block or delay your keyboard input.
 
 ## Prerequisites
 

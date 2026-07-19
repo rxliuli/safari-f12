@@ -14,13 +14,24 @@ final class F12Tap {
 
     var isRunning: Bool { tap != nil }
 
+    var isEnabled: Bool {
+        tap.map { CGEvent.tapIsEnabled(tap: $0) } ?? false
+    }
+
     func start() -> Bool {
         guard tap == nil else { return true }
         let mask: CGEventMask = 1 << CGEventType.keyDown.rawValue
+        // .listenOnly is a hard safety requirement, not an optimization: an
+        // ACTIVE tap sits synchronously in the system keyboard pipeline, and
+        // when the Accessibility permission is revoked mid-flight the system
+        // can leave it enabled-but-unauthorized, freezing input system-wide
+        // until this process dies. A listen-only tap observes asynchronously
+        // and can never block delivery, no matter how it fails. The cost:
+        // F12 also reaches Safari, which ignores it by default.
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
-            options: .defaultTap,
+            options: .listenOnly,
             eventsOfInterest: mask,
             callback: eventTapCallback,
             userInfo: nil
@@ -110,10 +121,10 @@ private func eventTapCallback(
         return Unmanaged.passRetained(event)
     }
 
-    // F12 = keycode 111
+    // F12 = keycode 111. Listen-only taps cannot swallow the event; Safari
+    // also receives the F12 press and ignores it.
     if event.getIntegerValueField(.keyboardEventKeycode) == 111, isSafariFrontmost() {
         sendOptionCommandI()
-        return nil // swallow the F12 event
     }
 
     return Unmanaged.passRetained(event)

@@ -19,11 +19,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         autoRegisterLoginItem()
         startTapWhenTrusted()
 
-        // Watchdog: if the permission is revoked while the tap is alive, tear
-        // it down within seconds — an unauthorized active tap blocks keyboard
-        // input system-wide, and no callback is guaranteed to tell us.
+        // Watchdog: notice when the tap died behind our back (permission
+        // revoked, tap disabled without a callback) and fall back to the
+        // waiting state. The tap is listen-only so this is about restoring
+        // F12, not about system safety.
         watchdogTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
-            if F12Tap.shared.isRunning, !AXIsProcessTrusted() {
+            guard F12Tap.shared.isRunning else { return }
+            if !AXIsProcessTrusted() || !F12Tap.shared.isEnabled {
                 F12Tap.shared.stop()
                 self?.handlePermissionLost()
             }
@@ -43,6 +45,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // Opening the app again while it is running brings the window back.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        // Recreate the tap so the window reports the truth — creation runs a
+        // fresh TCC check, unlike AXIsProcessTrusted() which can be stale.
+        if F12Tap.shared.isRunning {
+            F12Tap.shared.stop()
+        }
+        startTapWhenTrusted()
         showStatusWindow()
         return false
     }
