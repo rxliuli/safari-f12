@@ -1,3 +1,9 @@
 .build
 bin
 .DS_Store
+
+# xcodegen 的产物
+SafariF12.xcodeproj
+
+# apple-release/dmg.sh 的产物目录（build/apple-release/）
+build
