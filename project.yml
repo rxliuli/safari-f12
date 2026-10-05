@@ -1,11 +1,12 @@
 name: SafariF12
 
-# .xcodeproj 的唯一真相来源（生成物在 .gitignore 里）。
-# 为什么需要它：SwiftPM 不产出 .app（没有 bundle 布局 / Info.plist 落位 / 签名公证），
-# 那些正是发布需要的全部，只有 xcodebuild archive 现成给你。
-# Package.swift 保留给 `swift run` 的日常开发，两边共用同一份 Sources。
+# The single source of truth for the .xcodeproj (the generated one is gitignored).
+# Why it is needed: SwiftPM does not produce a .app (no bundle layout / Info.plist placement /
+# signing or notarization), and those are exactly what shipping requires - only
+# `xcodebuild archive` hands them to you. Package.swift stays for day-to-day `swift run`
+# development, with both sharing the same Sources.
 #
-# 用手工维护的 project.pbxproj 会腐烂（AppDowngrader 就是这么坏的），所以用 xcodegen。
+# A hand-maintained project.pbxproj rots (that is how AppDowngrader broke), hence xcodegen.
 
 options:
   bundleIdPrefix: com.rxliuli
@@ -16,10 +17,15 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    # 版本号真相在 Resources/Info.plist（发版 CI 读它判断要不要发）；
-    # 这里只服务于本机 archive，发版时由 release.yml 覆盖。
+    # The **single source of truth** for the version is right here: Resources/Info.plist holds
+    # $(MARKETING_VERSION) / $(CURRENT_PROJECT_VERSION), substituted by Xcode at build time.
+    # The release CI reads this file with rxliuli/version-check to decide whether to publish, so
+    # a version bump is a one-line change here and nowhere else.
     MARKETING_VERSION: "0.1.6"
-    CURRENT_PROJECT_VERSION: "0.1.6"
+    # The build number is derived from the version as x*10000 + y*100 + z (0.1.6 -> 106).
+    # dmg.sh computes the same value in CI and overrides this; the value here only serves local
+    # archives.
+    CURRENT_PROJECT_VERSION: "106"
     DEAD_CODE_STRIPPING: YES
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     CODE_SIGN_STYLE: Automatic
@@ -31,9 +37,9 @@ targets:
     platform: macOS
     sources:
       - path: Sources/SafariF12
-      # 约定：Resources/ 的内容原样进 Contents/Resources/。
-      # Info.plist 必须排除（它在 Copy Bundle Resources 里会让 Xcode 报错），
-      # 它由 INFOPLIST_FILE 处理成 Contents/Info.plist。
+      # Convention: whatever is in Resources/ lands verbatim in Contents/Resources/.
+      # Info.plist has to be excluded (leaving it in Copy Bundle Resources makes Xcode fail),
+      # and INFOPLIST_FILE turns it into Contents/Info.plist instead.
       - path: Resources
         excludes:
           - Info.plist
