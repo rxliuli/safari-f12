@@ -114,11 +114,11 @@ private func eventTapCallback(
                 CGEvent.tapEnable(tap: port, enable: true)
             }
         }
-        return Unmanaged.passRetained(event)
+        return Unmanaged.passUnretained(event)
     }
 
     guard type == .keyDown else {
-        return Unmanaged.passRetained(event)
+        return Unmanaged.passUnretained(event)
     }
 
     // F12 = keycode 111. Listen-only taps cannot swallow the event; Safari
@@ -127,5 +127,5 @@ private func eventTapCallback(
         sendOptionCommandI()
     }
 
-    return Unmanaged.passRetained(event)
+    return Unmanaged.passUnretained(event)
 }
